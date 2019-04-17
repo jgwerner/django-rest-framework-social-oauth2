@@ -17,8 +17,6 @@ from social_django.utils import load_backend, load_strategy
 from social_core.exceptions import MissingBackend, SocialAuthBaseException
 from social_core.utils import requests
 
-from .settings import DRFSO2_URL_NAMESPACE
-
 
 log = logging.getLogger(__name__)
 
@@ -42,11 +40,12 @@ class SocialTokenGrant(RefreshTokenGrant):
         if request.grant_type != 'convert_token':
             raise errors.UnsupportedGrantTypeError(request=request)
 
-        # We check that a token parameter is present.
-        # It should contain the social token to be used with the backend
-        if request.token is None:
+        # We check that a either token or code parameter are present.
+        # It should contain the social token or authorization code
+        # to be used with the backend
+        if request.token is None and request.code is None:
             raise errors.InvalidRequestError(
-                description='Missing token parameter.',
+                description='Missing token or code parameter.',
                 request=request)
 
         # We check that a backend parameter is present.
@@ -86,14 +85,14 @@ class SocialTokenGrant(RefreshTokenGrant):
 
         try:
             backend = load_backend(strategy, request.backend,
-                                   reverse("%s:%s:complete" % (DRFSO2_URL_NAMESPACE, NAMESPACE) , args=(request.backend,)))
+                                   reverse(NAMESPACE + ":complete", args=(request.backend,)))
         except MissingBackend:
             raise errors.InvalidRequestError(
                 description='Invalid backend parameter.',
                 request=request)
 
         try:
-            user = backend.do_auth(access_token=request.token)
+            user = backend.auth_complete(access_token=request.token)
         except requests.HTTPError as e:
             raise errors.InvalidRequestError(
                 description="Backend responded with HTTP{0}: {1}.".format(e.response.status_code,
